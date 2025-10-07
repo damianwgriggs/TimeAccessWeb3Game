@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -157,6 +156,8 @@
         <div class="text-center mb-4 border-b-2 border-gray-700 pb-2">
             <h1 class="text-2xl font-bold text-cyan-400">Code Broker</h1>
             <p class="text-green-400">Access Granted. Your access will expire in <span id="timeLeft" class="font-bold">60</span> seconds.</p>
+            <!-- === ADDED LINE === -->
+            <p class="text-sm text-yellow-400 mt-2">If you cannot see the game, please refresh the page.</p>
         </div>
         <div class="game-container">
             <div class="log-panel" id="logPanel"></div>
@@ -175,7 +176,7 @@
         const fujiChainId = '0xa869';
         const serviceCostHex = '0x38D7EA4C68000'; // 0.001 AVAX in hex
         
-        // --- NEW: 1-Minute Subscription Duration for Testing ---
+        // --- 1-Minute Subscription Duration for Testing ---
         const ONE_MINUTE_IN_MS = 60 * 1000;
 
         // --- DOM Elements ---
@@ -286,8 +287,7 @@
         function showGame() {
             dom.paymentView.classList.add('hidden');
             dom.gameView.classList.remove('hidden');
-            // Focus the command input when the game starts
-            document.getElementById('commandInput').focus();
+            startGame(); // Initialize the game now that the view is visible
             startTimer();
         }
         
@@ -309,12 +309,11 @@
                 const timeLeftMs = (timestamp + ONE_MINUTE_IN_MS) - Date.now();
                 if (timeLeftMs <= 0) {
                     clearInterval(interval);
-                    // Reload the page to force re-payment
                     window.location.reload(); 
                 } else {
                     dom.timeLeftEl.textContent = Math.round(timeLeftMs / 1000);
                 }
-            }, 1000); // Update every second
+            }, 1000);
         }
 
         // --- Initial check on page load ---
@@ -332,21 +331,16 @@
     
     <!-- SCRIPT FOR CODE BROKER GAME LOGIC -->
     <script>
-       // --- Gameplay Constants ---
        const TAX_PERIOD = 10;
        const TAX_RATE = 0.40;
        const ADMIN_COST_PER_DEV = 50;
        const XP_THRESHOLDS = { 1: 20, 2: 40, 3: 60 };
        const POACH_FEE_MULTIPLIER = 5;
        const POACH_ATTEMPT_COST = 2500;
-
-       // --- Name/Company Lists for Generation ---
        const FIRST_NAMES = ["Alice", "Bob", "Charlie", "Dana", "Eve", "Frank", "Grace", "Heidi", "Ivan", "Judy", "Kyle", "Liam", "Mia", "Noah", "Olivia"];
        const LAST_NAMES = ["Smith", "Jones", "Williams", "Brown", "Davis", "Miller", "Wilson", "Moore", "Taylor", "Anderson", "Thomas", "Jackson", "White"];
        const COMPANY_PREFIX = ["Innovate", "Quantum", "Synergy", "NextGen", "Apex", "Stellar", "Titan", "Vortex", "Cyber"];
        const COMPANY_SUFFIX = ["Solutions", "Dynamics", "Systems", "Tech", "Labs", "Group", "Enterprises"];
-
-       // --- Helper Functions ---
        const randint = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
        const choice = (arr) => arr[Math.floor(Math.random() * arr.length)];
        const choices = (arr, weights, k) => {
@@ -366,640 +360,95 @@
        };
        const getProjectId = (companyName) => (companyName.match(/[A-Z]/g) || []).join('') + randint(1, 99);
 
-
-       // --- Game Entity Classes ---
        class Developer {
            constructor(firstName, lastName, skill, tier, employer = "Available") {
-               this.firstName = firstName;
-               this.lastName = lastName;
-               this.name = `${firstName} ${lastName}`;
+               this.firstName = firstName; this.lastName = lastName; this.name = `${firstName} ${lastName}`;
                this.devId = `${firstName.slice(0, 2)}${lastName.slice(0, 2)}`.toUpperCase();
-               this.skill = skill;
-               this.tier = tier;
-               this.assignment = null;
-               this.team = null;
-               this.experiencePoints = 0;
-               this.xpToNextLevel = XP_THRESHOLDS[this.tier] || Infinity;
-               this.employer = employer;
-               this.recalculateStats();
+               this.skill = skill; this.tier = tier; this.assignment = null; this.team = null;
+               this.experiencePoints = 0; this.xpToNextLevel = XP_THRESHOLDS[this.tier] || Infinity;
+               this.employer = employer; this.recalculateStats();
            }
-
            recalculateStats() {
-               if (this.tier === 1) {
-                   this.speed = randint(30, 50);
-                   this.quality = randint(1, 4);
-                   this.salary = 150 + this.speed;
-               } else if (this.tier === 2) {
-                   this.speed = randint(25, 40);
-                   this.quality = randint(5, 8);
-                   this.salary = 250 + (this.speed * 2) + (this.quality * 10);
-               } else if (this.tier === 3) {
-                   this.speed = randint(15, 25);
-                   this.quality = randint(9, 10);
-                   this.salary = 400 + (this.speed * 3) + (this.quality * 20);
-               } else if (this.tier === 4) {
-                   this.speed = randint(20, 30);
-                   this.quality = 10;
-                   this.salary = 800 + (this.speed * 5) + (this.quality * 30);
-               }
+               if (this.tier === 1) { this.speed = randint(30, 50); this.quality = randint(1, 4); this.salary = 150 + this.speed; }
+               else if (this.tier === 2) { this.speed = randint(25, 40); this.quality = randint(5, 8); this.salary = 250 + (this.speed * 2) + (this.quality * 10); }
+               else if (this.tier === 3) { this.speed = randint(15, 25); this.quality = randint(9, 10); this.salary = 400 + (this.speed * 3) + (this.quality * 20); }
+               else if (this.tier === 4) { this.speed = randint(20, 30); this.quality = 10; this.salary = 800 + (this.speed * 5) + (this.quality * 30); }
                this.xpToNextLevel = XP_THRESHOLDS[this.tier] || Infinity;
            }
        }
-
        class Contract {
-           constructor(companyName, skillRequired, difficulty, day, rewardModifier = 1.0) {
-               this.companyName = companyName;
-               this.projectId = getProjectId(companyName);
-               this.skillRequired = skillRequired;
-               this.difficulty = difficulty;
-
-               let baseReward = 0;
-               if (this.difficulty === 1) {
-                   this.name = `${companyName} (Easy)`;
-                   this.complexity = randint(50, 150) + (day * 10);
-                   baseReward = this.complexity * 60 + randint(500, 2000);
-                   this.reputationGain = randint(5, 10);
-               } else if (this.difficulty === 2) {
-                   this.name = `${companyName} (Medium)`;
-                   this.complexity = randint(200, 400) + (day * 20);
-                   baseReward = this.complexity * 80 + randint(3000, 8000);
-                   this.reputationGain = randint(10, 20);
-               } else { // Difficulty 3
-                   this.name = `${companyName} (Hard)`;
-                   this.complexity = randint(500, 800) + (day * 30);
-                   baseReward = this.complexity * 100 + randint(10000, 20000);
-                   this.reputationGain = randint(25, 40);
-               }
-               
-               this.reward = Math.floor(baseReward * rewardModifier);
-               this.deadlineDays = day + Math.floor(this.complexity / 25) + 5;
-               this.bugTolerance = Math.floor(this.complexity / 3);
-               this.estimatedDays = Math.max(1, Math.round(this.complexity / 25));
-           }
+            constructor(companyName, skillRequired, difficulty, day, rewardModifier = 1.0) {
+                this.companyName = companyName; this.projectId = getProjectId(companyName);
+                this.skillRequired = skillRequired; this.difficulty = difficulty; let baseReward = 0;
+                if (this.difficulty === 1) { this.name = `${companyName} (Easy)`; this.complexity = randint(50, 150) + (day * 10); baseReward = this.complexity * 60 + randint(500, 2000); this.reputationGain = randint(5, 10); }
+                else if (this.difficulty === 2) { this.name = `${companyName} (Medium)`; this.complexity = randint(200, 400) + (day * 20); baseReward = this.complexity * 80 + randint(3000, 8000); this.reputationGain = randint(10, 20); }
+                else { this.name = `${companyName} (Hard)`; this.complexity = randint(500, 800) + (day * 30); baseReward = this.complexity * 100 + randint(10000, 20000); this.reputationGain = randint(25, 40); }
+                this.reward = Math.floor(baseReward * rewardModifier);
+                this.deadlineDays = day + Math.floor(this.complexity / 25) + 5;
+                this.bugTolerance = Math.floor(this.complexity / 3);
+                this.estimatedDays = Math.max(1, Math.round(this.complexity / 25));
+            }
        }
-
-       class Project {
-           constructor(contract) {
-               this.contract = contract;
-               this.assignedDevelopers = [];
-               this.assignedEntityName = null;
-               this.progressPoints = 0;
-               this.bugPoints = 0;
-           }
-       }
-
+       class Project { constructor(contract) { this.contract = contract; this.assignedDevelopers = []; this.assignedEntityName = null; this.progressPoints = 0; this.bugPoints = 0; } }
        class Competitor {
-           constructor(name) {
-               this.name = name;
-               this.reputation = randint(40, 60);
-               this.roster = [];
-               this.generateRoster();
-           }
-           
-           generateRoster(count = 5) {
-               this.roster = [];
-               for (let i = 0; i < count; i++) {
-                   const first = choice(FIRST_NAMES);
-                   const last = choice(LAST_NAMES);
-                   const skill = choice(['Frontend', 'Backend', 'AI']);
-                   const tier = choices([1, 2, 3], [3, 5, 2], 1)[0];
-                   this.roster.push(new Developer(first, last, skill, tier, this.name));
-               }
-           }
-           
-           simulateDay() {
-               if (Math.random() < this.reputation / 120) {
-                   this.reputation += randint(1, 3);
-               } else {
-                   this.reputation = Math.max(10, this.reputation - randint(1, 2));
-               }
-               this.reputation = Math.min(150, this.reputation);
-           }
+            constructor(name) { this.name = name; this.reputation = randint(40, 60); this.roster = []; this.generateRoster(); }
+            generateRoster(count = 5) { this.roster = []; for (let i = 0; i < count; i++) { const first = choice(FIRST_NAMES); const last = choice(LAST_NAMES); const skill = choice(['Frontend', 'Backend', 'AI']); const tier = choices([1, 2, 3], [3, 5, 2], 1)[0]; this.roster.push(new Developer(first, last, skill, tier, this.name)); } }
+            simulateDay() { if (Math.random() < this.reputation / 120) { this.reputation += randint(1, 3); } else { this.reputation = Math.max(10, this.reputation - randint(1, 2)); } this.reputation = Math.min(150, this.reputation); }
        }
        
-       // --- Main Game Object ---
        const Game = {
-           funds: 10000,
-           reputation: 50,
-           day: 1,
-           gameOver: false,
-           
-           availableContracts: [],
-           activeProjects: [],
-           availableDevelopers: [],
-           hiredDevelopers: [],
-           teams: {},
-           competitors: {
-               "innovateai": new Competitor("InnovateAI"),
-               "quantumdynamics": new Competitor("QuantumDynamics"),
-               "synergylabs": new Competitor("SynergyLabs")
-           },
-           
-           revenueSinceLastTax: 0,
-           expensesSinceLastTax: 0,
-           
-           currentEvent: null,
-           eventDaysLeft: 0,
-           mainLog: [],
-           
-           logPanel: document.getElementById('logPanel'),
-           hudPanel: document.getElementById('hudPanel'),
-           commandInput: document.getElementById('commandInput'),
-
+           funds: 10000, reputation: 50, day: 1, gameOver: false,
+           availableContracts: [], activeProjects: [], availableDevelopers: [], hiredDevelopers: [], teams: {},
+           competitors: { "innovateai": new Competitor("InnovateAI"), "quantumdynamics": new Competitor("QuantumDynamics"), "synergylabs": new Competitor("SynergyLabs") },
+           revenueSinceLastTax: 0, expensesSinceLastTax: 0, currentEvent: null, eventDaysLeft: 0, mainLog: [],
+           logPanel: null, hudPanel: null, commandInput: null,
            init() {
-               this.commandInput.addEventListener('keydown', (e) => {
-                   if (e.key === 'Enter') {
-                       this.processCommand(this.commandInput.value);
-                       this.commandInput.value = '';
-                   }
-               });
-               
-               this.generateNewContracts();
-               this.generateNewDevelopers();
-               this.addLogEvent("Welcome to Code Broker! Type 'help' for commands.");
-               this.render();
+               this.logPanel = document.getElementById('logPanel'); this.hudPanel = document.getElementById('hudPanel'); this.commandInput = document.getElementById('commandInput');
+               this.commandInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { this.processCommand(this.commandInput.value); this.commandInput.value = ''; } });
+               this.generateNewContracts(); this.generateNewDevelopers(); this.addLogEvent("Welcome to Code Broker! Type 'help' for commands."); this.render();
            },
-           
-           addLogEvent(text) {
-               const logEntry = `Day ${this.day}: ${text}`;
-               this.mainLog.unshift(logEntry);
-               if (this.mainLog.length > 50) this.mainLog.pop();
-               this.renderLog();
-           },
-
-           generateNewContracts(count = 4) {
-               let rewardModifier = 1.0;
-               if (this.currentEvent === "Market Boom") rewardModifier = 1.5;
-               if (this.currentEvent === "Market Bust") rewardModifier = 0.6;
-               
-               this.availableContracts = [];
-               const usedNames = new Set();
-               for (let i = 0; i < count; i++) {
-                   const skill = choice(['Frontend', 'Backend', 'AI']);
-                   let companyName = `${choice(COMPANY_PREFIX)}${choice(COMPANY_SUFFIX)}`;
-                   while (usedNames.has(companyName)) {
-                       companyName = `${choice(COMPANY_PREFIX)}${choice(COMPANY_SUFFIX)}`;
-                   }
-                   usedNames.add(companyName);
-                   const difficulty = choices([1, 2, 3], [5, 3, 1], 1)[0];
-                   this.availableContracts.push(new Contract(companyName, skill, difficulty, this.day, rewardModifier));
-               }
-
-               Object.values(this.competitors).forEach(comp => {
-                   if (this.availableContracts.length > 0 && Math.random() < comp.reputation / 150) {
-                       const takenContractIndex = randint(0, this.availableContracts.length - 1);
-                       const takenContract = this.availableContracts.splice(takenContractIndex, 1)[0];
-                       this.addLogEvent(`Market News: ${comp.name} secured the ${takenContract.companyName} contract.`);
-                   }
-               });
-
-               if (this.day > 1) this.addLogEvent("New contracts are available.");
-           },
-           
-           generateNewDevelopers(count = 4) {
-               if (this.currentEvent === "Talent Shortage") count = 2;
-               this.availableDevelopers = [];
-               const usedNames = new Set(this.hiredDevelopers.map(d => d.name));
-               for (let i = 0; i < count; i++) {
-                   let first, last, name;
-                   do {
-                       first = choice(FIRST_NAMES);
-                       last = choice(LAST_NAMES);
-                       name = `${first} ${last}`;
-                   } while (usedNames.has(name));
-                   usedNames.add(name);
-                   const skill = choice(['Frontend', 'Backend', 'AI']);
-                   const tier = choices([1, 2, 3], [5, 4, 2], 1)[0];
-                   this.availableDevelopers.push(new Developer(first, last, skill, tier));
-               }
-               if (this.day > 1) this.addLogEvent("New developers are available.");
-           },
-           
-           processCommand(input) {
-                if (this.gameOver) return;
-                const parts = input.toLowerCase().split(/\s+/).filter(p => p);
-                if (parts.length === 0) return;
-                
-                const command = parts[0];
-                const args = parts.slice(1);
-
-                const commands = {
-                    'help': () => this.addLogEvent("Commands: hire [id], fire [id], accept [id], assign [id] to [id], poach [id] from [competitor], team ..., advance day"),
-                    'hire': () => this.cmd_hire(args),
-                    'fire': () => this.cmd_fire(args),
-                    'accept': () => this.cmd_accept(args),
-                    'assign': () => { if (args.length >= 3 && args[1] === 'to') this.cmd_assign(args) },
-                    'team': () => this.cmd_team(args),
-                    'poach': () => { if (args.length >= 3 && args[1] === 'from') this.cmd_poach(args) },
-                    'advance': () => { if (args[0] === 'day') this.update() }
-                };
-                
-                if (commands[command]) {
-                    commands[command]();
-                } else {
-                    this.addLogEvent(`Invalid command: '${input}'. Type 'help'.`);
-                }
-                this.render();
-           },
-           
-           cmd_hire: function(args) { /* Full implementation in final code */ },
-           cmd_fire: function(args) { /* Full implementation in final code */ },
-           cmd_accept: function(args) { /* Full implementation in final code */ },
-           cmd_assign: function(args) { /* Full implementation in final code */ },
-           cmd_team: function(args) { /* Full implementation in final code */ },
-           cmd_poach: function(args) { /* Full implementation in final code */ },
-           
+           addLogEvent(text) { const logEntry = `Day ${this.day}: ${text}`; this.mainLog.unshift(logEntry); if (this.mainLog.length > 50) this.mainLog.pop(); this.renderLog(); },
+           generateNewContracts(count = 4) { let rewardModifier = 1.0; if (this.currentEvent === "Market Boom") rewardModifier = 1.5; if (this.currentEvent === "Market Bust") rewardModifier = 0.6; this.availableContracts = []; const usedNames = new Set(); for (let i = 0; i < count; i++) { const skill = choice(['Frontend', 'Backend', 'AI']); let companyName = `${choice(COMPANY_PREFIX)}${choice(COMPANY_SUFFIX)}`; while (usedNames.has(companyName)) { companyName = `${choice(COMPANY_PREFIX)}${choice(COMPANY_SUFFIX)}`; } usedNames.add(companyName); const difficulty = choices([1, 2, 3], [5, 3, 1], 1)[0]; this.availableContracts.push(new Contract(companyName, skill, difficulty, this.day, rewardModifier)); } Object.values(this.competitors).forEach(comp => { if (this.availableContracts.length > 0 && Math.random() < comp.reputation / 150) { const takenContractIndex = randint(0, this.availableContracts.length - 1); const takenContract = this.availableContracts.splice(takenContractIndex, 1)[0]; this.addLogEvent(`Market News: ${comp.name} secured the ${takenContract.companyName} contract.`); } }); if (this.day > 1) this.addLogEvent("New contracts are available."); },
+           generateNewDevelopers(count = 4) { if (this.currentEvent === "Talent Shortage") count = 2; this.availableDevelopers = []; const usedNames = new Set(this.hiredDevelopers.map(d => d.name)); for (let i = 0; i < count; i++) { let first, last, name; do { first = choice(FIRST_NAMES); last = choice(LAST_NAMES); name = `${first} ${last}`; } while (usedNames.has(name)); usedNames.add(name); const skill = choice(['Frontend', 'Backend', 'AI']); const tier = choices([1, 2, 3], [5, 4, 2], 1)[0]; this.availableDevelopers.push(new Developer(first, last, skill, tier)); } if (this.day > 1) this.addLogEvent("New developers are available."); },
+           processCommand(input) { if (this.gameOver) return; const parts = input.toLowerCase().split(/\s+/).filter(p => p); if (parts.length === 0) return; const command = parts[0]; const args = parts.slice(1); const commands = { 'help': () => this.addLogEvent("Commands: hire [id], fire [id], accept [id], assign [id] to [id], poach [id] from [competitor], team ..., advance day"), 'hire': () => this.cmd_hire(args), 'fire': () => this.cmd_fire(args), 'accept': () => this.cmd_accept(args), 'assign': () => { if (args.length >= 3 && args[1] === 'to') this.cmd_assign(args) }, 'team': () => this.cmd_team(args), 'poach': () => { if (args.length >= 3 && args[1] === 'from') this.cmd_poach(args) }, 'advance': () => { if (args[0] === 'day') this.update() } }; if (commands[command]) { commands[command](); } else { this.addLogEvent(`Invalid command: '${input}'. Type 'help'.`); } this.render(); },
+           cmd_hire: function(args) { if (!args[0]) return; const devId = args[0].toUpperCase(); const devIndex = this.availableDevelopers.findIndex(d => d.devId === devId); if (devIndex > -1) { const dev = this.availableDevelopers[devIndex]; if (this.funds >= dev.salary) { this.hiredDevelopers.push(dev); this.availableDevelopers.splice(devIndex, 1); this.addLogEvent(`Hired ${dev.name} (${dev.devId})!`); } else { this.addLogEvent(`Error: Not enough funds for ${dev.name}.`); } } else { this.addLogEvent(`Error: Dev ID '${devId}' not found.`); } },
+           cmd_fire: function(args) { if (!args[0]) return; const devId = args[0].toUpperCase(); const devIndex = this.hiredDevelopers.findIndex(d => d.devId === devId); if (devIndex > -1) { const dev = this.hiredDevelopers[devIndex]; if (dev.team) { const team = this.teams[dev.team]; const memberIndex = team.findIndex(member => member.devId === dev.devId); if(memberIndex > -1) team.splice(memberIndex, 1); dev.team = null; } this.activeProjects.forEach(proj => { const projDevIndex = proj.assignedDevelopers.findIndex(d => d.devId === dev.devId); if(projDevIndex > -1) proj.assignedDevelopers.splice(projDevIndex, 1); }); this.hiredDevelopers.splice(devIndex, 1); this.addLogEvent(`Fired ${dev.name}.`); } else { this.addLogEvent(`Error: Dev ID '${devId}' not on your team.`); } },
+           cmd_accept: function(args) { if (!args[0]) return; const projId = args[0].toUpperCase(); const contractIndex = this.availableContracts.findIndex(c => c.projectId.toUpperCase() === projId); if(contractIndex > -1) { const contract = this.availableContracts[contractIndex]; this.activeProjects.push(new Project(contract)); this.availableContracts.splice(contractIndex, 1); this.addLogEvent(`Contract ${contract.name} (${contract.projectId}) accepted.`); } else { this.addLogEvent(`Error: Project ID '${projId}' not found.`); } },
+           cmd_assign: function(args) { const entityId = args[0].toUpperCase(); const projId = args[2].toUpperCase(); const proj = this.activeProjects.find(p => p.contract.projectId.toUpperCase() === projId); if (!proj) { this.addLogEvent(`Error: Project ID '${projId}' not found.`); return; } if (this.teams[entityId.toLowerCase()]) { const teamName = entityId.toLowerCase(); const teamDevs = this.teams[teamName]; if (teamDevs.length === 0) { this.addLogEvent(`Error: Team '${teamName}' is empty.`); return; } for(const dev of teamDevs) { if (dev.assignment) { this.addLogEvent(`Error: ${dev.name} in team ${teamName} is already assigned.`); return; } if (dev.skill !== proj.contract.skillRequired) { this.addLogEvent(`Skill mismatch in team ${teamName}: ${dev.name} is ${dev.skill}.`); return; } } proj.assignedDevelopers.push(...teamDevs); proj.assignedEntityName = teamName; teamDevs.forEach(dev => dev.assignment = proj.contract.projectId); this.addLogEvent(`Team '${teamName}' assigned to ${proj.contract.projectId}.`); } else { const dev = this.hiredDevelopers.find(d => d.devId === entityId); if (dev) { if (dev.assignment) { this.addLogEvent(`Error: ${dev.name} is already assigned.`); return; } if (dev.skill !== proj.contract.skillRequired) { this.addLogEvent(`Skill mismatch for ${dev.name}.`); return; } dev.assignment = proj.contract.projectId; proj.assignedDevelopers.push(dev); proj.assignedEntityName = dev.devId; this.addLogEvent(`${dev.name} assigned to ${proj.contract.projectId}.`); } else { this.addLogEvent(`Error: Developer or Team ID '${entityId}' not found.`); } } },
+           cmd_team: function(args) { const subCommand = args[0]; if (subCommand === "create" && args[1]) { const teamName = args[1].toLowerCase(); if (this.teams[teamName]) { this.addLogEvent(`Error: Team '${teamName}' already exists.`); } else { this.teams[teamName] = []; this.addLogEvent(`Team '${teamName}' created.`); } } else if (subCommand === "assign" && args.length >= 4 && args[2] === "to") { const devId = args[1].toUpperCase(); const teamName = args[3].toLowerCase(); const dev = this.hiredDevelopers.find(d => d.devId === devId); if (!dev) { this.addLogEvent(`Error: Dev ID '${devId}' not found.`); return; } if (!this.teams[teamName]) { this.addLogEvent(`Error: Team '${teamName}' does not exist.`); return; } if (dev.team) { this.addLogEvent(`Error: ${dev.name} is already in team '${dev.team}'.`); return; } this.teams[teamName].push(dev); dev.team = teamName; this.addLogEvent(`${dev.name} added to team '${teamName}'.`); } else if (subCommand === "unassign" && args[1]) { const devId = args[1].toUpperCase(); const dev = this.hiredDevelopers.find(d => d.devId === devId); if (!dev) { this.addLogEvent(`Error: Dev ID '${devId}' not found.`); return; } if (!dev.team) { this.addLogEvent(`Error: ${dev.name} is not on a team.`); return; } const teamName = dev.team; this.teams[teamName] = this.teams[teamName].filter(d => d.devId !== devId); dev.team = null; this.addLogEvent(`${dev.name} removed from team '${teamName}'.`); } else { this.addLogEvent("Invalid team command: use create, assign, or unassign."); } },
+           cmd_poach: function(args) { const devId = args[0].toUpperCase(); const competitorName = args[2].toLowerCase(); if (!this.competitors[competitorName]) { this.addLogEvent(`Error: Competitor '${competitorName}' not found.`); return; } const competitor = this.competitors[competitorName]; const devToPoach = competitor.roster.find(d => d.devId === devId); if (!devToPoach) { this.addLogEvent(`Error: ${competitor.name} has no dev with ID '${devId}'.`); return; } if (this.funds < POACH_ATTEMPT_COST) { this.addLogEvent(`Error: Need $${POACH_ATTEMPT_COST} to attempt poaching.`); return; } this.funds -= POACH_ATTEMPT_COST; this.expensesSinceLastTax += POACH_ATTEMPT_COST; this.addLogEvent(`Spending $${POACH_ATTEMPT_COST} to make an offer to ${devToPoach.name}...`); const poachFee = devToPoach.salary * POACH_FEE_MULTIPLIER; const successChance = (this.reputation / (this.reputation + competitor.reputation)) * 0.75; setTimeout(() => { if (Math.random() < successChance) { if (this.funds >= poachFee) { this.funds -= poachFee; this.expensesSinceLastTax += poachFee; competitor.roster = competitor.roster.filter(d => d.devId !== devId); devToPoach.employer = "Player"; this.hiredDevelopers.push(devToPoach); this.addLogEvent(`SUCCESS! ${devToPoach.name} joins for a fee of $${poachFee}!`); } else { this.addLogEvent(`Offer accepted, but you couldn't afford the $${poachFee} fee!`); } } else { this.addLogEvent(`FAILURE! ${devToPoach.name} rejected your offer.`); } this.render(); }, 1000); },
            update() {
-               if (this.gameOver) return;
-               this.day++;
-               this.addLogEvent(`--- Day ${this.day} Begins ---`);
-
-               // Event Logic
-               if (this.eventDaysLeft > 0) {
-                   this.eventDaysLeft--;
-                   if (this.eventDaysLeft === 0) {
-                       this.addLogEvent(`The ${this.currentEvent} has ended.`);
-                       this.currentEvent = null;
-                   }
-               } else if (Math.random() < 0.1) {
-                   const eventType = choice(["Market Boom", "Market Bust", "Talent Shortage", "VC Funding"]);
-                   this.currentEvent = eventType;
-                   if (eventType === "VC Funding") {
-                       const funding = this.reputation * 1000;
-                       this.funds += funding;
-                       this.addLogEvent(`EVENT: A VC firm invests $${funding}!`);
-                       this.currentEvent = null;
-                   } else {
-                       this.eventDaysLeft = randint(3, 5);
-                       this.addLogEvent(`EVENT: A ${this.currentEvent} has begun! Lasts ${this.eventDaysLeft} days.`);
-                   }
-               }
-
+               if (this.gameOver) return; this.day++; this.addLogEvent(`--- Day ${this.day} Begins ---`);
+               if (this.eventDaysLeft > 0) { this.eventDaysLeft--; if (this.eventDaysLeft === 0) { this.addLogEvent(`The ${this.currentEvent} has ended.`); this.currentEvent = null; } } else if (Math.random() < 0.1) { const eventType = choice(["Market Boom", "Market Bust", "Talent Shortage", "VC Funding"]); this.currentEvent = eventType; if (eventType === "VC Funding") { const funding = this.reputation * 1000; this.funds += funding; this.addLogEvent(`EVENT: A VC firm invests $${funding}!`); this.currentEvent = null; } else { this.eventDaysLeft = randint(3, 5); this.addLogEvent(`EVENT: A ${this.currentEvent} has begun! Lasts ${this.eventDaysLeft} days.`); } }
                Object.values(this.competitors).forEach(c => c.simulateDay());
-
-               const dailyAdminCost = this.hiredDevelopers.length * ADMIN_COST_PER_DEV;
-               const totalSalary = this.hiredDevelopers.reduce((sum, dev) => sum + dev.salary, 0);
-               const totalDailyCosts = dailyAdminCost + totalSalary;
-
-               if (this.funds < totalDailyCosts) {
-                   this.addLogEvent("GAME OVER: You are bankrupt!"); this.gameOver = true; return;
-               }
-
-               this.funds -= totalDailyCosts;
-               this.expensesSinceLastTax += totalDailyCosts;
-               if (totalSalary > 0) this.addLogEvent(`Paid $${totalSalary} in salaries.`);
-               if (dailyAdminCost > 0) this.addLogEvent(`Paid $${dailyAdminCost} in admin costs.`);
-
-               if (this.day > 1 && (this.day - 1) % TAX_PERIOD === 0) {
-                   const profit = this.revenueSinceLastTax - this.expensesSinceLastTax;
-                   if (profit > 0) {
-                       const taxDue = Math.floor(profit * TAX_RATE);
-                       this.funds -= taxDue;
-                       this.addLogEvent(`TAX DAY! Paid $${taxDue} in taxes.`);
-                       if (this.funds < 0) { this.addLogEvent("GAME OVER: Taxes bankrupted you!"); this.gameOver = true; return; }
-                   } else {
-                       this.addLogEvent("TAX DAY! No profit made, no taxes paid.");
-                   }
-                   this.revenueSinceLastTax = 0;
-                   this.expensesSinceLastTax = 0;
-               }
-                
-               // Rest of the update logic...
-               this.hiredDevelopers.forEach(dev => {
-                   if (dev.assignment) {
-                       dev.experiencePoints++;
-                       if (dev.tier < 4 && dev.experiencePoints >= dev.xpToNextLevel) {
-                           dev.tier++;
-                           dev.experiencePoints = 0;
-                           dev.recalculateStats();
-                           this.addLogEvent(`${dev.name} is now Tier ${dev.tier}! Salary is $${dev.salary}.`);
-                       }
-                   }
-               });
-
-               this.activeProjects.forEach(proj => {
-                   if (proj.assignedDevelopers.length > 0) {
-                       proj.progressPoints += proj.assignedDevelopers.reduce((s, d) => s + d.speed, 0);
-                       proj.bugPoints += proj.assignedDevelopers.reduce((s, d) => s + Math.max(0, 10 - d.quality), 0);
-                   }
-               });
-               
+               const dailyAdminCost = this.hiredDevelopers.length * ADMIN_COST_PER_DEV; const totalSalary = this.hiredDevelopers.reduce((sum, dev) => sum + dev.salary, 0); const totalDailyCosts = dailyAdminCost + totalSalary;
+               if (this.funds < totalDailyCosts) { this.addLogEvent("GAME OVER: You are bankrupt!"); this.gameOver = true; return; }
+               this.funds -= totalDailyCosts; this.expensesSinceLastTax += totalDailyCosts; if (totalSalary > 0) this.addLogEvent(`Paid $${totalSalary} in salaries.`); if (dailyAdminCost > 0) this.addLogEvent(`Paid $${dailyAdminCost} in admin costs.`);
+               if (this.day > 1 && (this.day - 1) % TAX_PERIOD === 0) { const profit = this.revenueSinceLastTax - this.expensesSinceLastTax; if (profit > 0) { const taxDue = Math.floor(profit * TAX_RATE); this.funds -= taxDue; this.addLogEvent(`TAX DAY! Paid $${taxDue} in taxes.`); if (this.funds < 0) { this.addLogEvent("GAME OVER: Taxes bankrupted you!"); this.gameOver = true; return; } } else { this.addLogEvent("TAX DAY! No profit made, no taxes paid."); } this.revenueSinceLastTax = 0; this.expensesSinceLastTax = 0; }
+               this.hiredDevelopers.forEach(dev => { if (dev.assignment) { dev.experiencePoints++; if (dev.tier < 4 && dev.experiencePoints >= dev.xpToNextLevel) { dev.tier++; dev.experiencePoints = 0; dev.recalculateStats(); this.addLogEvent(`${dev.name} is now Tier ${dev.tier}! Salary is $${dev.salary}.`); } } });
+               this.activeProjects.forEach(proj => { if (proj.assignedDevelopers.length > 0) { proj.progressPoints += proj.assignedDevelopers.reduce((s, d) => s + d.speed, 0); proj.bugPoints += proj.assignedDevelopers.reduce((s, d) => s + Math.max(0, 10 - d.quality), 0); } });
                const completed = [], failed = [];
-               this.activeProjects.forEach(proj => {
-                   const unassignAll = (p) => {
-                       p.assignedDevelopers.forEach(d => d.assignment = null);
-                       p.assignedDevelopers = [];
-                       p.assignedEntityName = null;
-                   };
-
-                   if (proj.progressPoints >= proj.contract.complexity) {
-                       this.funds += proj.contract.reward;
-                       this.revenueSinceLastTax += proj.contract.reward;
-                       this.reputation += proj.contract.reputationGain;
-                       this.addLogEvent(`${proj.contract.name} complete! Gained $${proj.contract.reward}.`);
-                       completed.push(proj);
-                       unassignAll(proj);
-                   } else if (proj.bugPoints > proj.contract.bugTolerance) {
-                       this.reputation = Math.max(0, this.reputation - proj.contract.reputationGain * 2);
-                       this.addLogEvent(`${proj.contract.name} failed due to bugs!`);
-                       failed.push(proj);
-                       unassignAll(proj);
-                   } else if (this.day > proj.contract.deadlineDays) {
-                       this.reputation = Math.max(0, this.reputation - proj.contract.reputationGain);
-                       this.addLogEvent(`${proj.contract.name} missed its deadline!`);
-                       failed.push(proj);
-                       unassignAll(proj);
-                   }
-               });
-
+               this.activeProjects.forEach(proj => { const unassignAll = (p) => { p.assignedDevelopers.forEach(d => d.assignment = null); p.assignedDevelopers = []; p.assignedEntityName = null; }; if (proj.progressPoints >= proj.contract.complexity) { this.funds += proj.contract.reward; this.revenueSinceLastTax += proj.contract.reward; this.reputation += proj.contract.reputationGain; this.addLogEvent(`${proj.contract.name} complete! Gained $${proj.contract.reward}.`); completed.push(proj); unassignAll(proj); } else if (proj.bugPoints > proj.contract.bugTolerance) { this.reputation = Math.max(0, this.reputation - proj.contract.reputationGain * 2); this.addLogEvent(`${proj.contract.name} failed due to bugs!`); failed.push(proj); unassignAll(proj); } else if (this.day > proj.contract.deadlineDays) { this.reputation = Math.max(0, this.reputation - proj.contract.reputationGain); this.addLogEvent(`${proj.contract.name} missed its deadline!`); failed.push(proj); unassignAll(proj); } });
                this.activeProjects = this.activeProjects.filter(p => !completed.includes(p) && !failed.includes(p));
-
-               this.generateNewContracts();
-               this.generateNewDevelopers();
-               this.render();
+               this.generateNewContracts(); this.generateNewDevelopers(); this.render();
            },
-
-           render() {
-               this.renderLog();
-               this.renderHUD();
-           },
-
-           renderLog() {
-               this.logPanel.innerHTML = this.mainLog.map(entry => `<div class="log-entry">${entry}</div>`).join('');
-           },
-
-           renderHUD() {
-               let html = '';
-               html += this.renderHUD_Status();
-               html += this.renderHUD_ActiveProjects();
-               html += this.renderHUD_MyTeam();
-               html += this.renderHUD_MyTeams();
-               html += this.renderHUD_MarketIntel();
-               html += this.renderHUD_AvailableDevs();
-               html += this.renderHUD_AvailableContracts();
-               this.hudPanel.innerHTML = html;
-           },
-           
-            renderHUD_Status: function() {
-                const fundsColor = this.funds > 5000 ? 'green' : this.funds > 0 ? 'orange' : 'red';
-                const nextTaxDay = Math.floor((this.day -1) / TAX_PERIOD) * TAX_PERIOD + TAX_PERIOD + 1;
-                let eventHtml = '';
-                if(this.currentEvent) {
-                    eventHtml = `<p><span class="color-event">Event: ${this.currentEvent} (${this.eventDaysLeft} days left)</span></p>`;
-                }
-
-                return `
-                    <div class="hud-section">
-                        <h2>Status</h2>
-                        <p>Funds: <span class="color-${fundsColor}">$${this.funds.toLocaleString()}</span></p>
-                        <p>Reputation: ${this.reputation}</p>
-                        <p>Day: ${this.day}</p>
-                        ${eventHtml}
-                        <p>Daily Admin Cost: <span class="color-orange">$${(this.hiredDevelopers.length * ADMIN_COST_PER_DEV).toLocaleString()}</span></p>
-                        <p>Next Tax Day: <span class="color-red">${nextTaxDay}</span></p>
-                    </div>
-                `;
-            },
-            renderHUD_ActiveProjects: function() { /* Full implementation in final code */ },
-            renderHUD_MyTeam: function() { /* Full implementation in final code */ },
-            renderHUD_MyTeams: function() { /* Full implementation in final code */ },
-            renderHUD_MarketIntel: function() { /* Full implementation in final code */ },
-            renderHUD_AvailableDevs: function() { /* Full implementation in final code */ },
-            renderHUD_AvailableContracts: function() { /* Full implementation in final code */ }
+           render() { this.renderLog(); this.renderHUD(); },
+           renderLog() { this.logPanel.innerHTML = this.mainLog.map(entry => `<div class="log-entry">${entry}</div>`).join(''); },
+           renderHUD() { let html = ''; html += this.renderHUD_Status(); html += this.renderHUD_ActiveProjects(); html += this.renderHUD_MyTeam(); html += this.renderHUD_MyTeams(); html += this.renderHUD_MarketIntel(); html += this.renderHUD_AvailableDevs(); html += this.renderHUD_AvailableContracts(); this.hudPanel.innerHTML = html; },
+           renderHUD_Status: function() { const fundsColor = this.funds > 5000 ? 'green' : this.funds > 0 ? 'orange' : 'red'; const nextTaxDay = Math.floor((this.day -1) / TAX_PERIOD) * TAX_PERIOD + TAX_PERIOD + 1; let eventHtml = ''; if(this.currentEvent) { eventHtml = `<p><span class="color-event">Event: ${this.currentEvent} (${this.eventDaysLeft} days left)</span></p>`; } return ` <div class="hud-section"> <h2>Status</h2> <p>Funds: <span class="color-${fundsColor}">$${this.funds.toLocaleString()}</span></p> <p>Reputation: ${this.reputation}</p> <p>Day: ${this.day}</p> ${eventHtml} <p>Daily Admin Cost: <span class="color-orange">$${(this.hiredDevelopers.length * ADMIN_COST_PER_DEV).toLocaleString()}</span></p> <p>Next Tax Day: <span class="color-red">${nextTaxDay}</span></p> </div> `; },
+           renderHUD_ActiveProjects: function() { let projectsHtml = '<p class="color-grey">- None</p>'; if (this.activeProjects.length > 0) { projectsHtml = this.activeProjects.map(proj => { const daysLeft = proj.contract.deadlineDays - this.day; let statusColor = 'blue'; if (proj.bugPoints > proj.contract.bugTolerance || daysLeft < 0) statusColor = 'red'; else if (proj.bugPoints > proj.contract.bugTolerance * 0.75 || daysLeft < 3) statusColor = 'orange'; const devDisplay = proj.assignedEntityName ? proj.assignedEntityName.charAt(0).toUpperCase() + proj.assignedEntityName.slice(1) : (proj.assignedDevelopers.map(d=>d.firstName).join(', ') || 'None'); return ` <p><strong>- ${proj.contract.name} [${proj.contract.projectId}] [${proj.contract.skillRequired}]</strong></p> <p style="margin-left: 2rem;">Devs: ${devDisplay}</p> <p style="margin-left: 2rem;" class="color-${statusColor}">Progress: ${proj.progressPoints.toLocaleString()}/${proj.contract.complexity.toLocaleString()} | Bugs: ${proj.bugPoints}/${proj.contract.bugTolerance} | Days Left: ${daysLeft}</p> `; }).join(''); } return `<div class="hud-section"><h2>Active Projects</h2>${projectsHtml}</div>`; },
+           renderHUD_MyTeam: function() { let teamHtml = '<p class="color-grey">- None</p>'; if (this.hiredDevelopers.length > 0) { teamHtml = this.hiredDevelopers.sort((a,b) => b.tier - a.tier).map(dev => { const xpText = dev.tier < 4 ? `XP: ${dev.experiencePoints}/${dev.xpToNextLevel}` : 'XP: MAX'; const teamText = dev.team ? ` [${dev.team.charAt(0).toUpperCase() + dev.team.slice(1)}]` : ''; return ` <p><strong class="${dev.team ? 'color-team' : ''}">- T${dev.tier} ${dev.name} (${dev.devId})${teamText}</strong></p> <p style="margin-left: 2rem;" class="color-xp">Assign: ${dev.assignment || 'Idle'} | Sal: $${dev.salary} | ${xpText}</p> `; }).join(''); } return `<div class="hud-section"><h2>My Team</h2>${teamHtml}</div>`; },
+           renderHUD_MyTeams: function() { let teamsHtml = '<p class="color-grey">- None</p>'; if(Object.keys(this.teams).length > 0) { teamsHtml = Object.entries(this.teams).map(([name, members]) => { const memberNames = members.map(d => d.firstName).join(', ') || 'Empty'; return `<p class="color-team">- <strong>${name.charAt(0).toUpperCase() + name.slice(1)}:</strong> ${memberNames}</p>`; }).join(''); } return `<div class="hud-section"><h2>My Teams</h2>${teamsHtml}</div>`; },
+           renderHUD_MarketIntel: function() { const intelHtml = Object.values(this.competitors).map(comp => { const rosterPreview = comp.roster.slice(0, 3).map(d => d.devId).join(', ') + (comp.roster.length > 3 ? '...' : ''); return ` <p><strong class="color-orange">- ${comp.name} | Rep: ${comp.reputation}</strong></p> <p style="margin-left: 2rem;" class="color-grey">Roster: ${rosterPreview}</p> `; }).join(''); return `<div class="hud-section"><h2>Market Intel</h2>${intelHtml}</div>`; },
+           renderHUD_AvailableDevs: function() { let devsHtml = '<p class="color-grey">- None</p>'; if (this.availableDevelopers.length > 0) { devsHtml = this.availableDevelopers.map(dev => `<p>- T${dev.tier} ${dev.name} (${dev.devId}) (${dev.skill}) | Sal: $${dev.salary}</p>`).join(''); } return `<div class="hud-section"><h2>Available for Hire</h2>${devsHtml}</div>`; },
+           renderHUD_AvailableContracts: function() { let contractsHtml = '<p class="color-grey">- None</p>'; if (this.availableContracts.length > 0) { contractsHtml = this.availableContracts.map(c => `<p>- [${c.projectId}] ${c.name} | ${c.skillRequired} | $${c.reward.toLocaleString()} | Est: ${c.estimatedDays}d</p>`).join(''); } return `<div class="hud-section"><h2>Available Contracts</h2>${contractsHtml}</div>`; },
        };
        
-       // --- Full Implementations ---
-        Game.cmd_hire = function(args) {
-            if (!args[0]) return;
-            const devId = args[0].toUpperCase();
-            const devIndex = this.availableDevelopers.findIndex(d => d.devId === devId);
-            if (devIndex > -1) {
-                const dev = this.availableDevelopers[devIndex];
-                if (this.funds >= dev.salary) {
-                    this.hiredDevelopers.push(dev);
-                    this.availableDevelopers.splice(devIndex, 1);
-                    this.addLogEvent(`Hired ${dev.name} (${dev.devId})!`);
-                } else {
-                    this.addLogEvent(`Error: Not enough funds for ${dev.name}.`);
-                }
-            } else {
-                this.addLogEvent(`Error: Dev ID '${devId}' not found.`);
-            }
-        };
-
-        Game.cmd_fire = function(args) {
-            if (!args[0]) return;
-            const devId = args[0].toUpperCase();
-            const devIndex = this.hiredDevelopers.findIndex(d => d.devId === devId);
-            if (devIndex > -1) {
-                const dev = this.hiredDevelopers[devIndex];
-                if (dev.team) {
-                    const team = this.teams[dev.team];
-                    const memberIndex = team.findIndex(member => member.devId === dev.devId);
-                    if(memberIndex > -1) team.splice(memberIndex, 1);
-                    dev.team = null;
-                }
-                this.activeProjects.forEach(proj => {
-                    const projDevIndex = proj.assignedDevelopers.findIndex(d => d.devId === dev.devId);
-                    if(projDevIndex > -1) proj.assignedDevelopers.splice(projDevIndex, 1);
-                });
-                this.hiredDevelopers.splice(devIndex, 1);
-                this.addLogEvent(`Fired ${dev.name}.`);
-            } else {
-                this.addLogEvent(`Error: Dev ID '${devId}' not on your team.`);
-            }
-        };
-        Game.cmd_accept = function(args) {
-             if (!args[0]) return;
-            const projId = args[0].toUpperCase();
-            const contractIndex = this.availableContracts.findIndex(c => c.projectId.toUpperCase() === projId);
-            if(contractIndex > -1) {
-                const contract = this.availableContracts[contractIndex];
-                this.activeProjects.push(new Project(contract));
-                this.availableContracts.splice(contractIndex, 1);
-                this.addLogEvent(`Contract ${contract.name} (${contract.projectId}) accepted.`);
-            } else {
-                this.addLogEvent(`Error: Project ID '${projId}' not found.`);
-            }
-        };
-
-        Game.cmd_assign = function(args) {
-            const entityId = args[0].toUpperCase();
-            const projId = args[2].toUpperCase();
-            const proj = this.activeProjects.find(p => p.contract.projectId.toUpperCase() === projId);
-            if (!proj) { this.addLogEvent(`Error: Project ID '${projId}' not found.`); return; }
-
-            if (this.teams[entityId.toLowerCase()]) {
-                const teamName = entityId.toLowerCase();
-                const teamDevs = this.teams[teamName];
-                if (teamDevs.length === 0) { this.addLogEvent(`Error: Team '${teamName}' is empty.`); return; }
-
-                for(const dev of teamDevs) {
-                    if (dev.assignment) { this.addLogEvent(`Error: ${dev.name} in team ${teamName} is already assigned.`); return; }
-                    if (dev.skill !== proj.contract.skillRequired) { this.addLogEvent(`Skill mismatch in team ${teamName}: ${dev.name} is ${dev.skill}.`); return; }
-                }
-                proj.assignedDevelopers.push(...teamDevs);
-                proj.assignedEntityName = teamName;
-                teamDevs.forEach(dev => dev.assignment = proj.contract.projectId);
-                this.addLogEvent(`Team '${teamName}' assigned to ${proj.contract.projectId}.`);
-            } else {
-                const dev = this.hiredDevelopers.find(d => d.devId === entityId);
-                if (dev) {
-                    if (dev.assignment) { this.addLogEvent(`Error: ${dev.name} is already assigned.`); return; }
-                    if (dev.skill !== proj.contract.skillRequired) { this.addLogEvent(`Skill mismatch for ${dev.name}.`); return; }
-                    
-                    dev.assignment = proj.contract.projectId;
-                    proj.assignedDevelopers.push(dev);
-                    proj.assignedEntityName = dev.devId;
-                    this.addLogEvent(`${dev.name} assigned to ${proj.contract.projectId}.`);
-                } else {
-                    this.addLogEvent(`Error: Developer or Team ID '${entityId}' not found.`);
-                }
-            }
-        };
-
-        Game.cmd_team = function(args) {
-            const subCommand = args[0];
-            if (subCommand === "create" && args[1]) {
-                const teamName = args[1].toLowerCase();
-                if (this.teams[teamName]) { this.addLogEvent(`Error: Team '${teamName}' already exists.`); }
-                else { this.teams[teamName] = []; this.addLogEvent(`Team '${teamName}' created.`); }
-            } else if (subCommand === "assign" && args.length >= 4 && args[2] === "to") {
-                const devId = args[1].toUpperCase();
-                const teamName = args[3].toLowerCase();
-                const dev = this.hiredDevelopers.find(d => d.devId === devId);
-                if (!dev) { this.addLogEvent(`Error: Dev ID '${devId}' not found.`); return; }
-                if (!this.teams[teamName]) { this.addLogEvent(`Error: Team '${teamName}' does not exist.`); return; }
-                if (dev.team) { this.addLogEvent(`Error: ${dev.name} is already in team '${dev.team}'.`); return; }
-                this.teams[teamName].push(dev);
-                dev.team = teamName;
-                this.addLogEvent(`${dev.name} added to team '${teamName}'.`);
-            } else if (subCommand === "unassign" && args[1]) {
-                const devId = args[1].toUpperCase();
-                const dev = this.hiredDevelopers.find(d => d.devId === devId);
-                if (!dev) { this.addLogEvent(`Error: Dev ID '${devId}' not found.`); return; }
-                if (!dev.team) { this.addLogEvent(`Error: ${dev.name} is not on a team.`); return; }
-                const teamName = dev.team;
-                this.teams[teamName] = this.teams[teamName].filter(d => d.devId !== devId);
-                dev.team = null;
-                this.addLogEvent(`${dev.name} removed from team '${teamName}'.`);
-            } else {
-                this.addLogEvent("Invalid team command: use create, assign, or unassign.");
-            }
-        };
-
-        Game.cmd_poach = function(args) {
-            const devId = args[0].toUpperCase();
-            const competitorName = args[2].toLowerCase();
-            if (!this.competitors[competitorName]) { this.addLogEvent(`Error: Competitor '${competitorName}' not found.`); return; }
-            
-            const competitor = this.competitors[competitorName];
-            const devToPoach = competitor.roster.find(d => d.devId === devId);
-
-            if (!devToPoach) { this.addLogEvent(`Error: ${competitor.name} has no dev with ID '${devId}'.`); return; }
-            if (this.funds < POACH_ATTEMPT_COST) { this.addLogEvent(`Error: Need $${POACH_ATTEMPT_COST} to attempt poaching.`); return; }
-
-            this.funds -= POACH_ATTEMPT_COST;
-            this.expensesSinceLastTax += POACH_ATTEMPT_COST;
-            this.addLogEvent(`Spending $${POACH_ATTEMPT_COST} to make an offer to ${devToPoach.name}...`);
-            
-            const poachFee = devToPoach.salary * POACH_FEE_MULTIPLIER;
-            const successChance = (this.reputation / (this.reputation + competitor.reputation)) * 0.75;
-
-            setTimeout(() => {
-                if (Math.random() < successChance) {
-                    if (this.funds >= poachFee) {
-                        this.funds -= poachFee;
-                        this.expensesSinceLastTax += poachFee;
-                        competitor.roster = competitor.roster.filter(d => d.devId !== devId);
-                        devToPoach.employer = "Player";
-                        this.hiredDevelopers.push(devToPoach);
-                        this.addLogEvent(`SUCCESS! ${devToPoach.name} joins for a fee of $${poachFee}!`);
-                    } else {
-                        this.addLogEvent(`Offer accepted, but you couldn't afford the $${poachFee} fee!`);
-                    }
-                } else {
-                    this.addLogEvent(`FAILURE! ${devToPoach.name} rejected your offer.`);
-                }
-                this.render();
-            }, 1000);
-        };
-
-        Game.renderHUD_ActiveProjects = function() {
-            let projectsHtml = '<p class="color-grey">- None</p>';
-            if (this.activeProjects.length > 0) {
-                projectsHtml = this.activeProjects.map(proj => {
-                    const daysLeft = proj.contract.deadlineDays - this.day;
-                    let statusColor = 'blue';
-                    if (proj.bugPoints > proj.contract.bugTolerance || daysLeft < 0) statusColor = 'red';
-                    else if (proj.bugPoints > proj.contract.bugTolerance * 0.75 || daysLeft < 3) statusColor = 'orange';
-                    const devDisplay = proj.assignedEntityName ? proj.assignedEntityName.charAt(0).toUpperCase() + proj.assignedEntityName.slice(1) : (proj.assignedDevelopers.map(d=>d.firstName).join(', ') || 'None');
-                    return `
-                        <p><strong>- ${proj.contract.name} [${proj.contract.projectId}] [${proj.contract.skillRequired}]</strong></p>
-                        <p style="margin-left: 2rem;">Devs: ${devDisplay}</p>
-                        <p style="margin-left: 2rem;" class="color-${statusColor}">Progress: ${proj.progressPoints.toLocaleString()}/${proj.contract.complexity.toLocaleString()} | Bugs: ${proj.bugPoints}/${proj.contract.bugTolerance} | Days Left: ${daysLeft}</p>
-                    `;
-                }).join('');
-            }
-            return `<div class="hud-section"><h2>Active Projects</h2>${projectsHtml}</div>`;
-        };
-        Game.renderHUD_MyTeam = function() {
-            let teamHtml = '<p class="color-grey">- None</p>';
-            if (this.hiredDevelopers.length > 0) {
-                teamHtml = this.hiredDevelopers.sort((a,b) => b.tier - a.tier).map(dev => {
-                    const xpText = dev.tier < 4 ? `XP: ${dev.experiencePoints}/${dev.xpToNextLevel}` : 'XP: MAX';
-                    const teamText = dev.team ? ` [${dev.team.charAt(0).toUpperCase() + dev.team.slice(1)}]` : '';
-                    return `
-                        <p><strong class="${dev.team ? 'color-team' : ''}">- T${dev.tier} ${dev.name} (${dev.devId})${teamText}</strong></p>
-                        <p style="margin-left: 2rem;" class="color-xp">Assign: ${dev.assignment || 'Idle'} | Sal: $${dev.salary} | ${xpText}</p>
-                    `;
-                }).join('');
-            }
-            return `<div class="hud-section"><h2>My Team</h2>${teamHtml}</div>`;
-        };
-        Game.renderHUD_MyTeams = function() {
-            let teamsHtml = '<p class="color-grey">- None</p>';
-            if(Object.keys(this.teams).length > 0) {
-                teamsHtml = Object.entries(this.teams).map(([name, members]) => {
-                    const memberNames = members.map(d => d.firstName).join(', ') || 'Empty';
-                    return `<p class="color-team">- <strong>${name.charAt(0).toUpperCase() + name.slice(1)}:</strong> ${memberNames}</p>`;
-                }).join('');
-            }
-            return `<div class="hud-section"><h2>My Teams</h2>${teamsHtml}</div>`;
-        };
-        Game.renderHUD_MarketIntel = function() {
-            const intelHtml = Object.values(this.competitors).map(comp => {
-                const rosterPreview = comp.roster.slice(0, 3).map(d => d.devId).join(', ') + (comp.roster.length > 3 ? '...' : '');
-                return `
-                    <p><strong class="color-orange">- ${comp.name} | Rep: ${comp.reputation}</strong></p>
-                    <p style="margin-left: 2rem;" class="color-grey">Roster: ${rosterPreview}</p>
-                `;
-            }).join('');
-            return `<div class="hud-section"><h2>Market Intel</h2>${intelHtml}</div>`;
-        };
-        Game.renderHUD_AvailableDevs = function() {
-            let devsHtml = '<p class="color-grey">- None</p>';
-            if (this.availableDevelopers.length > 0) {
-                devsHtml = this.availableDevelopers.map(dev => `<p>- T${dev.tier} ${dev.name} (${dev.devId}) (${dev.skill}) | Sal: $${dev.salary}</p>`).join('');
-            }
-            return `<div class="hud-section"><h2>Available for Hire</h2>${devsHtml}</div>`;
-        };
-        Game.renderHUD_AvailableContracts = function() {
-            let contractsHtml = '<p class="color-grey">- None</p>';
-            if (this.availableContracts.length > 0) {
-                contractsHtml = this.availableContracts.map(c => `<p>- [${c.projectId}] ${c.name} | ${c.skillRequired} | $${c.reward.toLocaleString()} | Est: ${c.estimatedDays}d</p>`).join('');
-            }
-            return `<div class="hud-section"><h2>Available Contracts</h2>${contractsHtml}</div>`;
-        };
-
-       // --- Start the Game ---
        document.addEventListener('DOMContentLoaded', () => {
-         // Only initialize the game if the game view is visible
          if (!document.getElementById('gameView').classList.contains('hidden')) {
             Game.init();
          }
        });
-       // A global function to be called when payment is successful
        function startGame() {
            Game.init();
        }
